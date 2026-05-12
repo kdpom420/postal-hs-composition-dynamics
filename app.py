@@ -50,21 +50,25 @@ country_years = sorted(
     ].unique()
 )
 
-year_pairs = list(zip(country_years[:-1], country_years[1:]))
+# -------------------------
+# Year Pair
+# -------------------------
 
-selected_pair = st.sidebar.selectbox(
+year_pair_labels = [
+    f"{int(a)} → {int(b)}"
+    for a, b in zip(country_years[:-1], country_years[1:])
+]
+
+selected_label = st.sidebar.selectbox(
     "Year Pair",
-    year_pairs
+    year_pair_labels
 )
 
-top_n = st.sidebar.slider(
-    "Top N HS Changes",
-    5,
-    30,
-    15
-)
-
-prev_year, curr_year = selected_pair
+# label 다시 분해
+prev_year, curr_year = [
+    int(x.strip())
+    for x in selected_label.split("→")
+]
 
 # -------------------------
 # Metrics
