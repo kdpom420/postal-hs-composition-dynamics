@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import plotly.express as px
 
 st.set_page_config(
     page_title="Country HS Composition Dynamics",
@@ -152,6 +153,13 @@ top_n = st.sidebar.slider(
 
 st.title(f"{selected_country_name} HS Composition Dynamics")
 
+st.markdown(
+    f"""
+    **Selected country:** `{selected_country_name}`  
+    **Year pair:** `{prev_year} → {curr_year}`
+    """
+)
+
 st.caption(
     "Exploratory visualization of country-level HS share changes "
     "using Korea export data filtered by postal-friendly HS candidate groups."
@@ -181,7 +189,17 @@ else:
     col2.metric("New HS", "N/A")
     col3.metric("Lost HS", "N/A")
     col4.metric("Common HS", "N/A")
+    
+if len(metric_row) > 0:
+    if m["ctry_hs_js_similarity"] >= 0.75:
+        insight_text = "This country shows relatively stable HS composition for the selected year pair."
+    elif m["ctry_hs_js_similarity"] >= 0.45:
+        insight_text = "This country shows moderate HS composition change for the selected year pair."
+    else:
+        insight_text = "This country shows strong HS composition transition for the selected year pair."
 
+    st.info(insight_text)
+    
 # -------------------------
 # Delta Data
 # -------------------------
@@ -244,22 +262,49 @@ plot_df = (
 
 st.subheader(f"HS Share Delta: {prev_year} → {curr_year}")
 
-fig, ax = plt.subplots(figsize=(12, 8))
-
-colors = ["red" if x < 0 else "blue" for x in plot_df["delta"]]
-
-ax.barh(
-    plot_df["label"],
-    plot_df["delta"],
-    color=colors
+plot_df["change_type"] = np.where(
+    plot_df["delta"] >= 0,
+    "Increase",
+    "Decrease"
 )
 
-ax.axvline(0, color="black")
-ax.set_xlabel("Share Change")
-ax.set_ylabel("HS Code")
-ax.grid(alpha=0.3)
+fig = px.bar(
+    plot_df,
+    x="delta",
+    y="label",
+    orientation="h",
+    color="change_type",
+    color_discrete_map={
+        "Increase": "#2563eb",
+        "Decrease": "#ef4444"
+    },
+    hover_data={
+        "hs_code": True,
+        "hs_desc": True,
+        "cluster_name": True,
+        "share_prev": ":.4f",
+        "share_curr": ":.4f",
+        "delta": ":.4f",
+        "label": False,
+        "change_type": False
+    },
+    title=f"HS Share Delta: {prev_year} → {curr_year}"
+)
 
-st.pyplot(fig)
+fig.add_vline(x=0, line_width=1, line_color="black")
+
+fig.update_layout(
+    template="plotly_white",
+    height=650,
+    margin=dict(l=20, r=20, t=60, b=20),
+    xaxis_title="Share Change",
+    yaxis_title="HS Code",
+    legend_title_text="Change",
+)
+
+fig.update_yaxes(autorange="reversed")
+
+st.plotly_chart(fig, use_container_width=True)
 
 # -------------------------
 # Tables
