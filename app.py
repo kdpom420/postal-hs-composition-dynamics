@@ -53,7 +53,12 @@ country_years = sorted(
 # -------------------------
 # Year Pair
 # -------------------------
-
+top_n = st.sidebar.slider(
+    "Top N HS Changes",
+    5,
+    30,
+    15
+)
 year_pair_labels = [
     f"{int(a)} → {int(b)}"
     for a, b in zip(country_years[:-1], country_years[1:])
