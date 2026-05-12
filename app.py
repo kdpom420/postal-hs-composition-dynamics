@@ -18,12 +18,24 @@ def load_data():
     ctry_country_summary = pd.read_csv(f"{DATA_DIR}/ctry_country_summary.csv")
     ctry_level_df = pd.read_csv(f"{DATA_DIR}/ctry_level_df.csv")
 
-    return ctry_country_year_hs, ctry_js_df, ctry_country_summary, ctry_level_df
+    partner_areas = pd.read_json(f"{DATA_DIR}/partnerAreas.json")
+
+    partner_areas = partner_areas.rename(columns={        
+        "PartnerCode": "partnerCode",
+        "PartnerDesc": "country_name",
+        "PartnerCodeIsoAlpha3": "iso3"
+    })
+    
+    partner_areas = partner_areas[
+        ["partnerCode", "country_name", "iso3"]
+    ].drop_duplicates()
+
+    return ctry_country_year_hs, ctry_js_df, ctry_country_summary, ctry_level_df, partner_areas   
 
 
-ctry_country_year_hs, ctry_js_df, ctry_country_summary, ctry_level_df = load_data()
+ctry_country_year_hs, ctry_js_df, ctry_country_summary, ctry_level_df, partner_areas = load_data()
 
-st.title("Country-level HS Composition Dynamics")
+st.title(f"{selected_country_name} HS Composition Dynamics")
 
 st.caption(
     "Exploratory visualization of country-level HS share changes "
@@ -36,20 +48,35 @@ st.caption(
 
 st.sidebar.header("Controls")
 
-country_list = sorted(ctry_country_year_hs["partnerCode"].unique())
+country_df = (
+    ctry_country_year_hs[["partnerCode"]]
+    .drop_duplicates()
+    .merge(partner_areas, on="partnerCode", how="left")
+)
 
-selected_country = st.sidebar.selectbox(
+country_df["country_label"] = (
+    country_df["country_name"].fillna("Unknown")
+    + " ("
+    + country_df["partnerCode"].astype(str)
+    + ")"
+)
+
+country_df = country_df.sort_values("country_label")
+
+selected_country_label = st.sidebar.selectbox(
     "Country",
-    country_list
+    country_df["country_label"]
 )
 
-country_years = sorted(
-    ctry_country_year_hs.loc[
-        ctry_country_year_hs["partnerCode"] == selected_country,
-        "year"
-    ].unique()
-)
+selected_country = country_df.loc[
+    country_df["country_label"] == selected_country_label,
+    "partnerCode"
+].iloc[0]
 
+selected_country_name = country_df.loc[
+    country_df["country_label"] == selected_country_label,
+    "country_name"
+].iloc[0]
 # -------------------------
 # Year Pair
 # -------------------------
