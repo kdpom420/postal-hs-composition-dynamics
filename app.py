@@ -304,10 +304,11 @@ fig.update_layout(
         f"({2019}-{2024})"
     ),
     font=dict(
+        family="Arial Black",
         size=15,
         color="black"
     ),
-    height=850,
+    height=750
     margin=dict(l=20, r=20, t=70, b=20),
     paper_bgcolor="white",
     plot_bgcolor="white"
@@ -570,7 +571,7 @@ else:
                 node=dict(
                     label=labels.tolist(),
                     pad=18,
-                    thickness=16,
+                    thickness=22,
                 ),
                 link=dict(
                     source=flow_df["source"].map(label_to_id),
