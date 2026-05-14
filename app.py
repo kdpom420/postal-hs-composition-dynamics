@@ -327,6 +327,27 @@ st.plotly_chart(
     }
 )
 
+cluster_desc_df = pd.DataFrame({
+    "Cluster": [
+        "C0", "C1", "C2",
+        "C3", "C4", "C5", "C6"
+    ],
+    "Meaning": [
+        "Small Declining",
+        "Growing Mid-Core",
+        "Stable Large Core",
+        "Volatile Decliner",
+        "Mixed Stable Niche",
+        "Surging Volatile",
+        "Dominant Persistent Core"
+    ]
+})
+
+st.dataframe(
+    cluster_desc_df,
+    use_container_width=True
+)
+
 # -------------------------
 # Tables
 # -------------------------
@@ -522,8 +543,7 @@ else:
 
         hs_year["node"] = (
             hs_year["year"].astype(str)
-            + "_"
-            + hs_year["behavior_state"]
+            + "_C"
         )
 
         # Exclude first year from transitions because growth/volatility features start from lag values.
