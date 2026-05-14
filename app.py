@@ -308,7 +308,7 @@ fig.update_layout(
         size=15,
         color="black"
     ),
-    height=750
+    height=750,
     margin=dict(l=20, r=20, t=70, b=20),
     paper_bgcolor="white",
     plot_bgcolor="white"
