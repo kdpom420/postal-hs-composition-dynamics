@@ -298,17 +298,34 @@ fig = px.bar(
 fig.add_vline(x=0, line_width=1, line_color="black")
 
 fig.update_layout(
-    template="plotly_white",
-    height=650,
-    margin=dict(l=20, r=20, t=60, b=20),
-    xaxis_title="Share Change",
-    yaxis_title="HS Code",
-    legend_title_text="Change",
+    title_text=(
+        f"HS Behavior-State Transition Sankey "
+        f"- {selected_country_name} "
+        f"({start_year}-{end_year})"
+    ),
+    font=dict(
+        size=15,
+        color="black"
+    ),
+    height=850,
+    margin=dict(l=20, r=20, t=70, b=20),
+    paper_bgcolor="white",
+    plot_bgcolor="white"
 )
 
 fig.update_yaxes(autorange="reversed")
 
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(
+    fig,
+    use_container_width=True,
+    config={
+        "displayModeBar": True,
+        "toImageButtonOptions": {
+            "format": "png",
+            "scale": 3
+        }
+    }
+)
 
 # -------------------------
 # Tables
