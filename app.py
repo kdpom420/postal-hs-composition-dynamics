@@ -322,7 +322,7 @@ st.plotly_chart(
         "displayModeBar": True,
         "toImageButtonOptions": {
             "format": "png",
-            "scale": 1
+            "scale": 2
         }
     }
 )
@@ -570,7 +570,7 @@ else:
                 node=dict(
                     label=labels.tolist(),
                     pad=18,
-                    thickness=2,
+                    thickness=16,
                 ),
                 link=dict(
                     source=flow_df["source"].map(label_to_id),
