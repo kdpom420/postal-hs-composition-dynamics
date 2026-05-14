@@ -301,7 +301,7 @@ fig.update_layout(
     title_text=(
         f"HS Behavior-State Transition Sankey "
         f"- {selected_country_name} "
-        f"({behavior_start_year}-{behavior_end_year})"
+        f"({2019}-{2024})"
     ),
     font=dict(
         size=15,
