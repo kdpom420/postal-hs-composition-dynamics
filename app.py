@@ -566,12 +566,28 @@ else:
                 pd.concat([flow_df["source"], flow_df["target"]]).unique()
             )
             label_to_id = {label: i for i, label in enumerate(labels)}
-
+            cluster_color_map = {
+                "Small Declining": "#A78BFA",
+                "Growing Mid-Core": "#60A5FA",
+                "Stable Large Core": "#FBBF24",
+                "Volatile Decliner": "#F87171",
+                "Mixed Stable Niche": "#34D399",
+                "Surging Volatile": "#FB923C",
+                "Dominant Persistent Core": "#818CF8"
+            }
+            
+            node_colors = []
+            
+            for label in labels:
+                cluster_name = str(label).split("_", 1)[1]
+                node_colors.append(cluster_color_map.get(cluster_name, "#CBD5E1"))
+                
             sankey_fig = go.Figure(data=[go.Sankey(
                 node=dict(
                     label=labels.tolist(),
+                    color=node_colors,
                     pad=18,
-                    thickness=22,
+                    thickness=22
                 ),
                 link=dict(
                     source=flow_df["source"].map(label_to_id),
