@@ -5,6 +5,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
+import plotly.graph_objects as go
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
 
 st.set_page_config(
     page_title="Country HS Composition Dynamics",
@@ -370,3 +374,215 @@ st.dataframe(
     level_rows[show_cols],
     use_container_width=True
 )
+
+
+# -------------------------
+# HS Behavior-State Transition Sankey
+# -------------------------
+
+st.subheader("HS Behavior-State Transition Sankey")
+
+st.caption(
+    "HS items are clustered by relative share, growth, volatility, and growth persistence. "
+    "The Sankey chart shows how each HS item moves across behavior states over time."
+)
+
+BEHAVIOR_CLUSTER_NAMES = {
+    0: "Small Declining",
+    1: "Growing Mid-Core",
+    2: "Stable Large Core",
+    3: "Volatile Decliner",
+    4: "Mixed Stable Niche",
+    5: "Surging Volatile",
+    6: "Dominant Persistent Core",
+}
+
+behavior_start_year = int(min(country_years))
+behavior_end_year = int(max(country_years))
+behavior_n_clusters = 7
+
+behavior_country = ctry_country_year_hs[
+    (ctry_country_year_hs["partnerCode"] == selected_country)
+    & (ctry_country_year_hs["year"] >= behavior_start_year)
+    & (ctry_country_year_hs["year"] <= behavior_end_year)
+].copy()
+
+code_col = "cmdCode_clean" if "cmdCode_clean" in behavior_country.columns else "hs_code"
+
+candidate_weight_cols = [
+    "netWgt",
+    "primaryValue",
+    "fobvalue",
+    "cifvalue",
+    "trade_value",
+    "value",
+    "ctry_hs_share",
+    "hs_share",
+    "share",
+    "wgt_share",
+]
+
+weight_col = next(
+    (col for col in candidate_weight_cols if col in behavior_country.columns),
+    None,
+)
+
+if weight_col is None:
+    st.warning("No valid weight/share column found for behavior-state Sankey.")
+elif behavior_country["year"].nunique() < 3:
+    st.warning("At least three years are recommended for behavior-state transition analysis.")
+else:
+    hs_year = (
+        behavior_country
+        .groupby([code_col, "year"], as_index=False)
+        .agg(weight=(weight_col, "sum"))
+    )
+
+    hs_year["year_total_weight"] = hs_year.groupby("year")["weight"].transform("sum")
+    hs_year["share"] = np.where(
+        hs_year["year_total_weight"] > 0,
+        hs_year["weight"] / hs_year["year_total_weight"],
+        0,
+    )
+
+    hs_year["log_weight"] = np.log1p(hs_year["weight"])
+    hs_year["log_share"] = np.log1p(hs_year["share"] * 1_000_000)
+
+    hs_year = hs_year.sort_values([code_col, "year"]).reset_index(drop=True)
+
+    hs_year["log_growth"] = hs_year.groupby(code_col)["log_weight"].diff()
+
+    hs_year["volatility_3y"] = (
+        hs_year.groupby(code_col)["log_growth"]
+        .rolling(3, min_periods=1)
+        .std()
+        .reset_index(level=0, drop=True)
+    )
+
+    hs_year["recent_growth_3y"] = (
+        hs_year.groupby(code_col)["log_growth"]
+        .rolling(3, min_periods=1)
+        .mean()
+        .reset_index(level=0, drop=True)
+    )
+
+    hs_year["growth_up"] = (hs_year["log_growth"] > 0).astype(float)
+
+    hs_year["growth_persistence_3y"] = (
+        hs_year.groupby(code_col)["growth_up"]
+        .rolling(3, min_periods=1)
+        .mean()
+        .reset_index(level=0, drop=True)
+    )
+
+    feature_cols = [
+        "log_share",
+        "log_growth",
+        "recent_growth_3y",
+        "volatility_3y",
+        "growth_persistence_3y",
+    ]
+
+    X = (
+        hs_year[feature_cols]
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0)
+    )
+
+    if len(X) < behavior_n_clusters:
+        st.warning("Not enough HS-year observations to build seven behavior clusters.")
+    else:
+        X_scaled = StandardScaler().fit_transform(X)
+
+        kmeans = KMeans(
+            n_clusters=behavior_n_clusters,
+            random_state=42,
+            n_init=20,
+        )
+
+        hs_year["hs_behavior_cluster"] = kmeans.fit_predict(X_scaled)
+        hs_year["behavior_state"] = hs_year["hs_behavior_cluster"].map(BEHAVIOR_CLUSTER_NAMES)
+
+        hs_year["node"] = (
+            hs_year["year"].astype(str)
+            + "_"
+            + hs_year["behavior_state"]
+        )
+
+        # Exclude first year from transitions because growth/volatility features start from lag values.
+        sankey_hs_year = hs_year[hs_year["year"] > behavior_start_year].copy()
+        sankey_years = list(range(behavior_start_year + 1, behavior_end_year + 1))
+
+        flows = []
+
+        for y1, y2 in zip(sankey_years[:-1], sankey_years[1:]):
+            left = (
+                sankey_hs_year[sankey_hs_year["year"] == y1]
+                [[code_col, "node"]]
+                .rename(columns={"node": "source"})
+            )
+
+            right = (
+                sankey_hs_year[sankey_hs_year["year"] == y2]
+                [[code_col, "node"]]
+                .rename(columns={"node": "target"})
+            )
+
+            pair = left.merge(right, on=code_col, how="inner")
+
+            if len(pair) > 0:
+                flow = (
+                    pair.groupby(["source", "target"], as_index=False)
+                    .size()
+                    .rename(columns={"size": "value"})
+                )
+                flows.append(flow)
+
+        if len(flows) == 0:
+            st.warning("Not enough overlapping HS codes to build behavior-state transitions.")
+        else:
+            flow_df = pd.concat(flows, ignore_index=True)
+
+            labels = pd.Index(
+                pd.concat([flow_df["source"], flow_df["target"]]).unique()
+            )
+            label_to_id = {label: i for i, label in enumerate(labels)}
+
+            sankey_fig = go.Figure(data=[go.Sankey(
+                node=dict(
+                    label=labels.tolist(),
+                    pad=18,
+                    thickness=16,
+                ),
+                link=dict(
+                    source=flow_df["source"].map(label_to_id),
+                    target=flow_df["target"].map(label_to_id),
+                    value=flow_df["value"],
+                ),
+            )])
+
+            sankey_fig.update_layout(
+                title_text=(
+                    f"HS Behavior-State Transition Sankey - {selected_country_name} "
+                    f"({behavior_start_year + 1}-{behavior_end_year})"
+                ),
+                font_size=10,
+                height=760,
+                margin=dict(l=20, r=20, t=60, b=20),
+            )
+
+            st.plotly_chart(sankey_fig, use_container_width=True)
+
+            cluster_profile = (
+                hs_year
+                .groupby(["hs_behavior_cluster", "behavior_state"])[feature_cols]
+                .mean()
+                .round(3)
+                .reset_index()
+            )
+
+            with st.expander("Behavior Cluster Profile"):
+                st.dataframe(cluster_profile, use_container_width=True)
+
+            with st.expander("Behavior Transition Table"):
+                st.dataframe(flow_df, use_container_width=True)
